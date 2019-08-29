@@ -1,0 +1,97 @@
+##################
+#
+# The R code is used to demonstrate the application of the non-linear regression models to the flint water lead contamination data set
+#
+##################
+
+## read data into R
+setwd("")
+flintlead<-read.csv(file="Flint-water-lead-dataset.csv",header=FALSE)
+head(flintlead)
+colnames(flintlead)=c("SampleID","Zip Code","Ward", "Pb Bottle 1(ppb)-First Draw", "Pb Bottle 2(ppb)- 45 secs flushing", "Pb Bottle 3(ppb)- 2 mins flusing")
+head(flintlead)
+
+## check the sampling frequency at different ward and zip code areas
+
+table(flintlead[,3])
+table(flintlead[,2])
+
+## check the distribution of the lead levels at different sampling time
+hist(flintlead[,4], main="Histogram of lead level at first draw", xlab="lead level")
+hist(flintlead[,5], main="Histogram of lead level after 45 secs", xlab="lead level")
+hist(flintlead[,6], main="Histogram of lead level after 2 mins", xlab="lead level")
+
+## Plot lead level versus the sampling time
+
+time<-c(0, 45, 120)
+matplot(time, t(flintlead[,4:6]),type="o", ylab="lead level")
+extremeID<-which(flintlead[,5]>1000)
+extremesvalues<-flintlead[extremeID,]
+
+## remove the extreme cases
+
+flintlead2<-flintlead[-extremeID,]
+matplot(time,t(flintlead2[,4:6]),type="o")
+
+## Plot lead level versus the sampling time for each zip code area
+
+zipcode1<-which(flintlead2[,2]==48503)
+matplot(time,t(flintlead2[zipcode1,4:6]),type="o",ylab="lead level",main="zip code 48503")
+
+zipcode2<-which(flintlead2[,2]==48504)
+matplot(time,t(flintlead2[zipcode2,4:6]),type="o",ylab="lead level",main="zip code 48504")
+
+zipcode3<-which(flintlead2[,2]==48505)
+matplot(time,t(flintlead2[zipcode3,4:6]),type="o",ylab="lead level",main="zip code 48505")
+
+zipcode4<-which(flintlead2[,2]==48506)
+matplot(time,t(flintlead2[zipcode4,4:6]),type="o",ylab="lead level",main="zip code 48506")
+
+zipcode5<-which(flintlead2[,2]==48507)
+matplot(time,t(flintlead2[zipcode5,4:6]),type="o",ylab="lead level",main="zip code 48507")
+
+## Removing zip code areas with small number of observations.
+
+zipcode6<-which(flintlead2[,2]==48502)
+zipcode7<-which(flintlead2[,2]==48529)
+zipcode8<-which(flintlead2[,2]==48532)
+flintlead3<-flintlead2[-c(zipcode6,zipcode7,zipcode8),]
+
+## Fit a nonlinear model for data coming from zip code area
+
+subset1<-which(flintlead3[,2]==48507)
+subsetflintlead<-flintlead3[subset1,]
+responses1<-unlist(subsetflintlead[,4:6])
+sampletime1<-rep(time,each=dim(subsetflintlead)[1])
+plot(sampletime1, response1)
+theta1<-5
+theta2<-0.02
+plot(sampletime1, theta1*exp(-sampletime1*theta2))
+
+nlsreg1<-nls(responses1~theta1*exp(-sampletime1*theta2), start=list(theta1=5,theta2=0.02))
+summary(nlsreg1)
+
+## Estimate the 90% quantile of the lead level
+
+time0<-0
+theta1hat<-coef(nlsreg1)[1]
+theta2hat<-coef(nlsreg1)[2]
+meany<-theta1hat*exp(-time0*theta2hat)
+sigmahat<-summary(nlsreg1)$sigma
+y90quantile<-qnorm(0.9, meany, sigmahat)
+
+## Constructing confidence intervals for 90% quantiles
+
+Dtheta<-cbind(exp(-theta2hat*sampletime1),-sampletime1*theta1hat*exp(-theta2hat*sampletime1))
+Vartheta<-solve(t(Dtheta)%*%Dtheta)
+Gbeta<-c(exp(-theta2hat*time0),(-time0)*theta1hat*exp(-theta2hat*time0))
+Varsigma<-(2*(sigmahat^4)/151)*(0.25/(sigmahat^2))*(qnorm(0.9))^2
+Vary90<-t(Gbeta)%*%Vartheta%*%Gbeta+Varsigma
+CI4y90quantile<-c(y90quantile-qnorm(0.975)*sigmahat*sqrt(Vary90),y90quantile+qnorm(0.975)*sigmahat*sqrt(Vary90))
+
+## in class additional code
+
+plot(sampletime1,responses1)
+median(subsetflintlead[,4])
+
+lines(sampletime1,theta1*exp(-sampletime1*theta2))
