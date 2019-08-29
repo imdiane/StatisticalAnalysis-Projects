@@ -1,0 +1,58 @@
+N=50000
+X = rgamma(n = N, shape= 2, rate = 2)
+prob = c(0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9)
+Y = qgamma(prob,shape = 2,rate = 2)
+
+hist(X)
+abline(v = quantile(X,probs = prob),col='red')
+
+hist(X)
+abline(v = Y,col='blue')
+
+## Composition Sampling (the t-distribution)
+N = 50000
+X = rep(NA, N)
+Y = rep(NA, N)
+for(i in 1:N){
+X[i] = rchisq(n = 1, df = 4, ncp = 0)
+Y[i] = rnorm(n = 1, mean = 0, sd = sqrt(1/X[i]))
+}
+
+Z = rnorm(n = N, mean = 0, sd = sqrt(var(Y)))
+d <- density(Y)
+dz <- density(Z)
+plot(d, main="Density of Y")
+polygon(d, col="red", border="blue")
+polygon(dz, col="green", border="blue")
+
+## Composition Sampling in the Multivariate Normal (MVN) distribution
+mu = c(1, 2, 0)
+S = diag(c(1, 1.2, 2))
+S[1,2] = S[2,1] = 0.2
+S[1,3] = S[3,1] = 0.3
+S[2,3] = S[3,2] = 0.1
+x1 <- rnorm(1, mean = 1, sd = 1)
+EX2_X1 <- mu[2] + S[2,1]/S[1,1]*(x1 - mu[1])
+EX2_X1
+
+covX2_X1 <- S[2,2] - S[2,1]/S[1,1]*S[1,2]
+covX2_X1
+
+x2 <- rnorm(1,mean = 2, sd = sqrt(1.2))
+x23 <- matrix(c(x1-mu[1], x2 - mu[2]))
+EX3_X2X1 <- mu[3] + S[3,1:2]%*%solve(S[1:2,1:2])%*%x23
+EX3_X2X1
+
+covX3_X1X2 <- S[3,3] - S[3,1:2]%*%solve(S[1:2,1:2])%*%S[1:2,3]
+covX3_X1X2
+
+N = 30000
+L = t(chol(S))
+Z = matrix(nrow = N, ncol = length(mu), rnorm(N*length(mu)))
+X = Z%*%t(L)
+for(i in 1:length(mu)){
+X[,i] = X[,i]+mu[i]
+}
+colMeans(X)
+
+var(X)
