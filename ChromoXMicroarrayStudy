@@ -1,0 +1,170 @@
+setwd("")
+chromoX<-read.table(file="ChromoXmicroarray.txt",header=TRUE)
+CSF2RA<-chromoX[which(chromoX$IDENTIFIER=="CSF2RA")[1],]
+
+############################################################################
+##
+## The group provides the patient information: 1 for the normal and non-BLC
+## patients and 2 for BLC patients. We performed a t-test to compare the difference
+## among the gene expression of these two groups of patients.
+##
+############################################################################
+
+group<-c(rep(1,27),rep(2,20))
+ttests<-function(x,group)
+{
+  x<-as.numeric(x)
+  pvalue<-t.test(x ~ group)$p.value;
+  return(pvalue)
+}
+pvalues<-ttests(CSF2RA[,c(3:49)],group)
+
+###############################################################
+## In the following SNPs data, 
+## 1 represents for "AA", 2 represents for "Aa", 
+## 3 represents for "aa", 4 for missing values;
+###############################################################
+
+ordered.ChromoXsnp<-read.table(file="ChromoXsnp.txt",header=TRUE)
+
+#################################################################
+#
+# Choose SNP and Microarray data for data analyses
+#
+#################################################################
+
+nearestSNPs<-ordered.ChromoXsnp[1,]
+SNPsX<-ordered.ChromoXsnp[1,c(1:78)]
+readsnpIDs<-read.table(file="SNPsampleIDs.txt")
+colnames(SNPsX)<-readsnpIDs[,2]
+nomissingSNPs<-SNPsX[,SNPsX!="4"]
+
+readmicroIDs<-read.table(file="MicroarraysampleIDs.txt")
+CSF2RAdata<-CSF2RA[,c(3:49)]
+ordered.CSF2RAdata<-CSF2RAdata[,order(colnames(CSF2RAdata))]
+colnames(ordered.CSF2RAdata)<-readmicroIDs[,2]
+
+finalSNPs<-nomissingSNPs[,colnames(nomissingSNPs)%in%colnames(ordered.CSF2RAdata)]
+finalMicroarray<-ordered.CSF2RAdata[,colnames(ordered.CSF2RAdata)%in%colnames(nomissingSNPs)]
+finalSNPs0<-finalSNPs[,order(colnames(finalSNPs))]
+finalMicroarray0<-finalMicroarray[,order(colnames(finalMicroarray))]
+
+finaldata<-rbind(finalMicroarray0,finalSNPs0)
+
+#################################################################
+#
+# Fit a linear model with SNP as covariates and microarray as
+# response vector.
+#
+# Additive model: 
+# 
+# AA: 2*b1  Aa: b1 aa: 0
+# 
+################################################################
+
+x0<-unlist(finalSNPs0)-1
+y0<-as.numeric(finalMicroarray0)
+lm0<-lm(y0~x0)
+
+################################################################
+#
+# Dominate models:
+# AA: b2; Aa: b2; aa: 0 
+# or
+# AA: 0; Aa: b2; aa: b2 
+################################################################
+
+x1<-((unlist(finalSNPs0)-1)!=0)+0
+y0<-as.numeric(finalMicroarray0)
+lm1<-lm(y0~x1)
+
+x2<-((unlist(finalSNPs0)-1)!=2)+0
+y0<-as.numeric(finalMicroarray0)
+lm2<-lm(y0~x2)
+
+################################################################
+#
+#  Another Additive model:
+#  AA: b1; aa: -b2; Aa: b1-b2 
+#
+################################################################
+
+xvec4AA<-c(1,1,0)
+xvec4aa<-c(1,0,-1)
+xvec4Aa<-c(1,1,-1)
+Xmat<-matrix(0,length(finalSNPs0),3)
+for (i in 1:length(finalSNPs0))
+{
+  Xmat[i,]<-xvec4AA*(finalSNPs0[i]=="1")+xvec4Aa*(finalSNPs0[i]=="2")+xvec4aa*(finalSNPs0[i]=="3")
+}
+
+betahat<-solve(t(Xmat)%*%Xmat)%*%t(Xmat)%*%y0
+lm3<-lm(y0~Xmat[,2]+Xmat[,3])
+
+#################################################################
+#
+# Model diagnostic
+#
+################################################################
+
+## Check normal distribution
+
+qqnorm(y0)
+
+## Check residuals
+
+predy<-Xmat%*%solve(t(Xmat)%*%Xmat)%*%t(Xmat)%*%y0
+epsilonhat<-y0-predy
+plot(predy, epsilonhat)
+
+################################################################
+# Confidence interval for b1-b2 or hypothesis testing for
+# H0: b1=b2 vs H1: b1\neq b2
+#
+################################################################
+
+n<-length(y0)
+rankx<-qr(Xmat)$rank
+SSE<-sum(epsilonhat^2)
+MSE<-SSE/(n-rankx)
+sigmahat<-sqrt(MSE)
+cvec<-c(0,1,-1)
+cbeta<-cvec%*%solve(t(Xmat)%*%Xmat)%*%t(Xmat)%*%y0
+varcbeta<-t(cvec)%*%solve(t(Xmat)%*%Xmat)%*%cvec
+low95cbeta<-cbeta-qt(0.975,n-rankx)*sigmahat*sqrt(varcbeta)
+upp95cbeta<-cbeta+qt(0.975,n-rankx)*sigmahat*sqrt(varcbeta)
+CI95cbeta<-c(low95cbeta,upp95cbeta)
+Tn<-cbeta/(sigmahat*sqrt(varcbeta))
+pvalue<-2*(1-pt(abs(Tn),n-rankx))
+
+################################################################
+#
+# Two-way ANOVA models
+#
+#################################################################
+
+nearest2SNPs<-ordered.ChromoXsnp[c(1:2),]
+SNPs2X<-ordered.ChromoXsnp[c(1:2),c(1:78)]
+readsnpIDs<-read.table(file="SNPsampleIDs.txt")
+colnames(SNPs2X)<-readsnpIDs[,2]
+nomissingSNPs<-SNPs2X[,(SNPs2X[1,]!="4")&(SNPs2X[2,]!="4")]
+
+readmicroIDs<-read.table(file="MicroarraysampleIDs.txt")
+CSF2RAdata<-CSF2RA[,c(3:49)]
+ordered.CSF2RAdata<-CSF2RAdata[,order(colnames(CSF2RAdata))]
+colnames(ordered.CSF2RAdata)<-readmicroIDs[,2]
+
+finalSNPs<-nomissingSNPs[,colnames(nomissingSNPs)%in%colnames(ordered.CSF2RAdata)]
+finalMicroarray<-ordered.CSF2RAdata[,colnames(ordered.CSF2RAdata)%in%colnames(nomissingSNPs)]
+finalSNPs0<-finalSNPs[,order(colnames(finalSNPs))]
+finalMicroarray0<-finalMicroarray[,order(colnames(finalMicroarray))]
+
+finaldata<-rbind(finalMicroarray0,finalSNPs0)
+
+snp1<-as.factor(unlist(finalSNPs0[1,]))
+snp2<-as.factor(unlist(finalSNPs0[2,]))
+y1<-as.numeric(finalMicroarray0)
+lm2anova<-lm(y1~snp1*snp2)
+
+qqnorm(lm2anova$res)
+interaction.plot(snp1,snp2,y1)
