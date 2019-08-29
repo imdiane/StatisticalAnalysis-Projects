@@ -1,2 +1,2 @@
-# StatisticalModeling-Projects
-Projects fielded in statistical modeling. (R)
+# StatisticalAnalysis-Projects
+Projects fielded in statistical analysis. (R)
