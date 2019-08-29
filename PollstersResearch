@@ -1,0 +1,493 @@
+## read data into R
+
+setwd("")
+polls2008<-read.csv(file="2008-polls.csv",header=TRUE)
+polls2012<-read.csv(file="2012-polls.csv",header=TRUE)
+results2008<-read.csv(file="2008-results.csv",header=TRUE)
+
+## Select data sampled by the pollers 
+
+pollsters20085<-table(polls2008$Pollster)[table(polls2008$Pollster)>=5]
+pollsters20125<-table(polls2012$Pollster)[table(polls2012$Pollster)>=5]
+subset1<-names(pollsters20085)[names(pollsters20085)%in%names(pollsters20125)]
+pollers<-names(pollsters20125)[names(pollsters20125)%in%subset1]
+subsamplesID2008<-polls2008[,5]%in%pollers
+polls2008sub<-polls2008[subsamplesID2008,]
+subsamplesID2012<-polls2012[,5]%in%pollers
+polls2012sub<-polls2012[subsamplesID2012,]
+
+
+# Q2
+## reformating the 2008 poll and true results data set as desired
+
+winers2008<-(results2008[,2]-results2008[,3]>0)+0
+StateID2008<-results2008[,1]
+Allresponses<-NULL
+for (sid in 1:51)
+{
+  polls2008substate<-polls2008sub[polls2008sub$State==StateID2008[sid],]
+  pollwiners2008state<-(polls2008substate[,2]-polls2008substate[,3]>0)+0
+  pollwinersIND<-(pollwiners2008state==winers2008[sid])+0
+  Allresponses<-c(Allresponses,pollwinersIND)
+}
+margins<-abs(polls2008sub[,2]-polls2008sub[,3])
+lagtime<-rep(0,dim(polls2008sub)[1])
+electiondate2008<-c("Nov 04 2008")
+for (i in 1:dim(polls2008sub)[1])
+{
+  lagtime[i]<-as.Date(electiondate2008, format="%b %d %Y")-as.Date(as.character(polls2008sub[i,4]), format="%b %d %Y")
+}
+dataset2008<-cbind(Allresponses,as.character(polls2008sub[,1]),margins,lagtime,as.character(polls2008sub[,5]))
+
+# Q3
+## 
+stateslist<-unique(dataset2008[which(dataset2008[,1]=="0"),2]) 
+subdataset2008<-dataset2008[dataset2008[,2]%in%stateslist,]
+
+# Q4
+##
+resp<-as.integer(subdataset2008[,1]) 
+statesFAC<-as.factor(subdataset2008[,2]) 
+margins<-as.double(subdataset2008[,3]) 
+lagtime<-as.double(subdataset2008[,4]) 
+pollersFAC<-as.factor(subdataset2008[,5])
+
+logitreg<-glm(resp~statesFAC+margins+lagtime+pollersFAC,family="binomial") 
+summary(logitreg)
+
+logitreg1<-glm(resp~margins+lagtime+pollersFAC,family="binomial") 
+anova(logitreg1,logitreg, test="Chisq")
+
+# Q5
+##
+logitreg1<-glm(resp~margins+lagtime+pollersFAC,family="binomial")
+AIC(logitreg)
+568.6820
+BIC(logitreg)
+739.5594
+AIC(logitreg1)
+652.0945
+BIC(logitreg1)
+724.0429
+
+# Q6
+##
+pollwiners2012<-(polls2012sub[,2]-polls2012sub[,3]>0)+0 
+margins2012<-abs(polls2012sub[,2]-polls2012sub[,3]) 
+lagtime2012<-rep(0,dim(polls2012sub)[1]) 
+electiondate2012<-c("Nov 06 2012")
+for (i in 1:dim(polls2012sub)[1])
+{
+  lagtime2012[i]<-as.Date(electiondate2012,format="%b%d%Y")-as.Date(as.character(polls2012sub[i,4]),format="%b%d%Y")
+}
+dataset2012<-cbind(pollwiners2012,as.character(polls2012sub[,1]),margins2012,lagtime2012,as.character(polls2012sub[,5]))
+
+subdataset2012<-dataset2012[dataset2012[,2]%in%stateslist,]
+
+## for"MI"state
+margins2012<-as.double(subdataset2012[,3]) 
+lagtime2012<-as.double(subdataset2012[,4]) 
+pollersFAC2012<-as.factor(subdataset2012[,5])
+NOpolls<-sum(subdataset2012[,2]=="MI") 
+locations<-which(subdataset2012[,2]=="MI") 
+MIPredictresults<-cbind(as.double(subdataset2012[locations,1]),rep(0,NOpolls)) 
+counts<-0
+for (i in locations)
+{
+  counts<-counts+1
+  MIdatapoints<-data.frame(statesFAC="MI", 
+                           margins=margins2012[i], 
+                           lagtime=lagtime2012[i], 
+                           pollersFAC=pollersFAC2012[i])
+  MIPredictresults[counts,2]<-predict(logitreg,MIdatapoints,type="response")
+}
+
+NOpolls<-sum(subdataset2012[,2]=="MI") 
+locations<-which(subdataset2012[,2]=="MI") 
+MIPredictresults1<-cbind(as.double(subdataset2012[locations,1]),rep(0,NOpolls)) 
+counts<-0
+for (i in locations)
+{
+  counts<-counts+1
+  MIdatapoints<-data.frame(margins=margins2012[i], 
+                           lagtime=lagtime2012[i], 
+                           pollersFAC=pollersFAC2012[i])
+  MIPredictresults1[counts,2]<-predict(logitreg1,MIdatapoints,type="response")
+}
+
+## for"FL"state
+margins2012<-as.double(subdataset2012[,3]) 
+lagtime2012<-as.double(subdataset2012[,4]) 
+pollersFAC2012<-as.factor(subdataset2012[,5])
+NOpolls<-sum(subdataset2012[,2]=="FL")
+
+locations<-which(subdataset2012[,2]=="FL") 
+FLPredictresults<-cbind(as.double(subdataset2012[locations,1]),rep(0,NOpolls)) 
+counts<-0
+for (i in locations)
+{
+  counts<-counts+1
+  FLdatapoints<-data.frame(statesFAC="FL", 
+                           margins=margins2012[i], 
+                           lagtime=lagtime2012[i], 
+                           pollersFAC=pollersFAC2012[i])
+  FLPredictresults[counts,2]<-predict(logitreg,FLdatapoints,type="response")
+}
+
+NOpolls<-sum(subdataset2012[,2]=="FL") 
+locations<-which(subdataset2012[,2]=="FL") 
+FLPredictresults1<-cbind(as.double(subdataset2012[locations,1]),rep(0,NOpolls)) 
+counts<-0
+for (i in locations)
+{
+  counts<-counts+1
+  FLdatapoints<-data.frame(margins=margins2012[i], 
+                           lagtime=lagtime2012[i], 
+                           pollersFAC=pollersFAC2012[i])
+  FLPredictresults1[counts,2]<-predict(logitreg1,FLdatapoints,type="response")
+}
+
+## for"MO"state
+margins2012<-as.double(subdataset2012[,3]) 
+lagtime2012<-as.double(subdataset2012[,4]) 
+pollersFAC2012<-as.factor(subdataset2012[,5])
+NOpolls<-sum(subdataset2012[,2]=="MO") 
+locations<-which(subdataset2012[,2]=="MO") 
+MOPredictresults<-cbind(as.double(subdataset2012[locations,1]),rep(0,NOpolls)) 
+counts<-0
+for (i in locations)
+{
+  counts<-counts+1
+  MOdatapoints<-data.frame(statesFAC="MO", 
+                           margins=margins2012[i], 
+                           lagtime=lagtime2012[i], 
+                           pollersFAC=pollersFAC2012[i])
+  MOPredictresults[counts,2]<-predict(logitreg,MOdatapoints,type="response")
+}
+
+NOpolls<-sum(subdataset2012[,2]=="MO") 
+locations<-which(subdataset2012[,2]=="MO") 
+MOPredictresults1<-cbind(as.double(subdataset2012[locations,1]),rep(0,NOpolls)) 
+counts<-0
+for (i in locations)
+{
+  counts<-counts+1
+  MOdatapoints<-data.frame(margins=margins2012[i], 
+                           lagtime=lagtime2012[i], 
+                           pollersFAC=pollersFAC2012[i])
+  MOPredictresults1[counts,2]<-predict(logitreg1,MOdatapoints,type="response")
+}
+
+## for"CO"state
+margins2012<-as.double(subdataset2012[,3]) 
+lagtime2012<-as.double(subdataset2012[,4]) 
+pollersFAC2012<-as.factor(subdataset2012[,5])
+NOpolls<-sum(subdataset2012[,2]=="CO")
+COPredictresults<-cbind(as.double(subdataset2012[1:NOpolls,1]),rep(0,NOpolls))
+counts<-0
+for (i in 1:NOpolls)
+{
+  counts<-counts+1
+  COdatapoints<-data.frame(statesFAC="CO", 
+                           margins=margins2012[i], 
+                           lagtime=lagtime2012[i], 
+                           pollersFAC=pollersFAC2012[i])
+  COPredictresults[i,2]<-predict(logitreg,COdatapoints,type="response")
+}
+
+NOpolls<-sum(subdataset2012[,2]=="CO")
+COPredictresults1<-cbind(as.double(subdataset2012[1:NOpolls,1]),rep(0,NOpolls)) 
+counts<-0
+for (i in 1:NOpolls)
+{ 
+  counts<-counts+1
+  COdatapoints<-data.frame(margins=margins2012[i],
+                           lagtime=lagtime2012[i], 
+                           pollersFAC=pollersFAC2012[i]) 
+  COPredictresults1[i,2]<-predict(logitreg1,COdatapoints,type="response")
+}
+
+
+# Q7
+## for "MI" state
+MIprobDemwin<-MIPredictresults[,1]*MIPredictresults[,2]+(1-MIPredictresults[,1])*(1-MIPredictresults[,2]) 
+MImeanProbDemwin<-mean(MIprobDemwin)
+MIprobGopwin<-(1-MIPredictresults[,1])*MIPredictresults[,2]+MIPredictresults[,1]*(1-MIPredictresults[,2])
+MImeanProbGopwin<-mean(MIprobGopwin)
+
+MIprobDemwin1<-MIPredictresults1[,1]*MIPredictresults1[,2]+(1-MIPredictresults1[,1])*(1-MIPredictresults1[,2]) 
+MImeanProbDemwin1<-mean(MIprobDemwin1)
+MIprobGopwin1<-(1-MIPredictresults1[,1])*MIPredictresults1[,2]+MIPredictresults1[,1]*(1-MIPredictresults1[,2])
+MImeanProbGopwin1<-mean(MIprobGopwin1)
+
+## for "FL" state
+FLprobDemwin<-FLPredictresults[,1]*FLPredictresults[,2]+(1-FLPredictresults[,1])*(1-FLPredictresults[,2]) 
+FLmeanProbDemwin<-mean(FLprobDemwin)
+FLprobGopwin<-(1-FLPredictresults[,1])*FLPredictresults[,2]+FLPredictresults[,1]*(1-FLPredictresults[,2])
+FLmeanProbGopwin<-mean(FLprobGopwin)
+
+FLprobDemwin1<-FLPredictresults1[,1]*FLPredictresults1[,2]+(1-FLPredictresults1[,1])*(1-FLPredictresults1[,2]) 
+FLmeanProbDemwin1<-mean(FLprobDemwin1)
+FLprobGopwin1<-(1-FLPredictresults1[,1])*FLPredictresults1[,2]+FLPredictresults1[,1]*(1-FLPredictresults1[,2])
+FLmeanProbGopwin1<-mean(FLprobGopwin1)
+
+## for "MO" state
+MOprobDemwin<-MOPredictresults[,1]*MOPredictresults[,2]+(1-MOPredictresults[,1])*(1-MOPredictresults[,2]) 
+MOmeanProbDemwin<-mean(MOprobDemwin)
+MOprobGopwin<-(1-MOPredictresults[,1])*MOPredictresults[,2]+MOPredictresults[,1]*(1-MOPredictresults[,2])
+MOmeanProbGopwin<-mean(MOprobGopwin)
+
+MOprobDemwin1<-MOPredictresults1[,1]*MOPredictresults1[,2]+(1-MOPredictresults1[,1])*(1-MOPredictresults1[,2]) 
+MOmeanProbDemwin1<-mean(MOprobDemwin1)
+MOprobGopwin1<-(1-MOPredictresults1[,1])*MOPredictresults1[,2]+MOPredictresults1[,1]*(1-MOPredictresults1[,2])
+MOmeanProbGopwin1<-mean(MOprobGopwin1)
+
+## for "CO" state
+COprobDemwin<-COPredictresults[,1]*COPredictresults[,2]+(1-COPredictresults[,1])*(1-COPredictresults[,2]) 
+COmeanProbDemwin<-mean(COprobDemwin)
+COprobGopwin<-(1-COPredictresults[,1])*COPredictresults[,2]+COPredictresults[,1]*(1-COPredictresults[,2])
+COmeanProbGopwin<-mean(COprobGopwin)
+
+COprobDemwin1<-COPredictresults1[,1]*COPredictresults1[,2]+(1-COPredictresults1[,1])*(1-COPredictresults1[,2]) 
+COmeanProbDemwin1<-mean(COprobDemwin1)
+COprobGopwin1<-(1-COPredictresults1[,1])*COPredictresults1[,2]+COPredictresults1[,1]*(1-COPredictresults1[,2])
+COmeanProbGopwin1<-mean(COprobGopwin1)
+
+# Q8
+## Depend on Q4
+Deritive<-function(x,beta)
+{deri0<-exp(x%*%beta)
+deri1<-deri0/((1+deri0)^2)
+return(deri1)
+}
+
+## Prediction intervals for "MI" state
+locations<-which(subdataset2012[,2]=="MI") 
+sub.MI2012<-subdataset2012[locations,] 
+loc2008<-which(subdataset2008[,2]=="MI") 
+SApart<-model.matrix(logitreg)[loc2008[1],c(1:23)] 
+ModMatQ4<-NULL
+for (i in 1:dim(sub.MI2012)[1])
+{
+  pollerloc2008<-which(subdataset2008[,5]==sub.MI2012[i,5]) 
+  PollersIND<-model.matrix(logitreg)[pollerloc2008[1],c(26:38)] 
+  ModMatQ4<-rbind(ModMatQ4,c(SApart,as.numeric(sub.MI2012[i,3:4]),PollersIND)) 
+}
+
+Ghat1<-apply(ModMatQ4,1,Deritive, beta=coef(logitreg)) 
+Ghat2<-ModMatQ4*Ghat1 
+Ghat3<-Ghat2*((-1)^(1+as.numeric(sub.MI2012[,1]))) 
+Ghat<-colMeans(Ghat3)
+Varphat<-t(Ghat)%*%vcov(logitreg)%*%Ghat 
+MIPredIntQ4Dem<-c(MImeanProbDemwin-qnorm(0.975)*sqrt(Varphat),MImeanProbDemwin+qnorm(0.975)*sqrt(Varphat)) 
+Ghat3rep<-Ghat2*((-1)^(as.numeric(sub.MI2012[,1]))) 
+Ghatrep<-colMeans(Ghat3rep) 
+Varphatrep<-t(Ghatrep)%*%vcov(logitreg)%*%Ghatrep 
+MIPredIntQ4Rep<-c(MImeanProbGopwin-qnorm(0.975)*sqrt(Varphatrep),MImeanProbGopwin+qnorm(0.975)*sqrt(Varphatrep))
+
+## Prediction intervals for "FL" state
+locations<-which(subdataset2012[,2]=="FL") 
+sub.FL2012<-subdataset2012[locations,] 
+loc2008<-which(subdataset2008[,2]=="FL") 
+SApart<-model.matrix(logitreg)[loc2008[1],c(1:23)] 
+ModMatQ4<-NULL
+for (i in 1:dim(sub.FL2012)[1])
+{
+  pollerloc2008<-which(subdataset2008[,5]==sub.FL2012[i,5]) 
+  PollersIND<-model.matrix(logitreg)[pollerloc2008[1],c(26:38)] 
+  ModMatQ4<-rbind(ModMatQ4,c(SApart,as.numeric(sub.FL2012[i,3:4]),PollersIND)) 
+}
+
+Ghat1<-apply(ModMatQ4,1,Deritive, beta=coef(logitreg)) 
+Ghat2<-ModMatQ4*Ghat1 
+Ghat3<-Ghat2*((-1)^(1+as.numeric(sub.FL2012[,1]))) 
+Ghat<-colMeans(Ghat3)
+Varphat<-t(Ghat)%*%vcov(logitreg)%*%Ghat 
+FLPredIntQ4Dem<-c(FLmeanProbDemwin-qnorm(0.975)*sqrt(Varphat),FLmeanProbDemwin+qnorm(0.975)*sqrt(Varphat)) 
+Ghat3rep<-Ghat2*((-1)^(as.numeric(sub.FL2012[,1]))) 
+Ghatrep<-colMeans(Ghat3rep) 
+Varphatrep<-t(Ghatrep)%*%vcov(logitreg)%*%Ghatrep 
+FLPredIntQ4Rep<-c(FLmeanProbGopwin-qnorm(0.975)*sqrt(Varphatrep),FLmeanProbGopwin+qnorm(0.975)*sqrt(Varphatrep))
+
+## Prediction intervals for "MO" state
+locations<-which(subdataset2012[,2]=="MO") 
+sub.MO2012<-subdataset2012[locations,] 
+loc2008<-which(subdataset2008[,2]=="MO") 
+SApart<-model.matrix(logitreg)[loc2008[1],c(1:23)] 
+ModMatQ4<-NULL
+for (i in 1:dim(sub.MO2012)[1])
+{
+  pollerloc2008<-which(subdataset2008[,5]==sub.MO2012[i,5]) 
+  PollersIND<-model.matrix(logitreg)[pollerloc2008[1],c(26:38)] 
+  ModMatQ4<-rbind(ModMatQ4,c(SApart,as.numeric(sub.MO2012[i,3:4]),PollersIND)) 
+}
+
+Ghat1<-apply(ModMatQ4,1,Deritive, beta=coef(logitreg)) 
+Ghat2<-ModMatQ4*Ghat1 
+Ghat3<-Ghat2*((-1)^(1+as.numeric(sub.MO2012[,1]))) 
+Ghat<-colMeans(Ghat3)
+Varphat<-t(Ghat)%*%vcov(logitreg)%*%Ghat 
+MOPredIntQ4Dem<-c(MOmeanProbDemwin-qnorm(0.975)*sqrt(Varphat),MOmeanProbDemwin+qnorm(0.975)*sqrt(Varphat)) 
+Ghat3rep<-Ghat2*((-1)^(as.numeric(sub.MO2012[,1]))) 
+Ghatrep<-colMeans(Ghat3rep) 
+Varphatrep<-t(Ghatrep)%*%vcov(logitreg)%*%Ghatrep 
+MOPredIntQ4Rep<-c(MOmeanProbGopwin-qnorm(0.975)*sqrt(Varphatrep),MOmeanProbGopwin+qnorm(0.975)*sqrt(Varphatrep))
+
+## Prediction intervals for "CO" state
+locations<-which(subdataset2012[,2]=="CO") 
+sub.CO2012<-subdataset2012[locations,] 
+loc2008<-which(subdataset2008[,2]=="CO") 
+SApart<-model.matrix(logitreg)[loc2008[1],c(1:23)] 
+COdMatQ4<-NULL
+for (i in 1:dim(sub.CO2012)[1])
+{
+  pollerloc2008<-which(subdataset2008[,5]==sub.CO2012[i,5]) 
+  PollersIND<-model.matrix(logitreg)[pollerloc2008[1],c(26:38)] 
+  COdMatQ4<-rbind(COdMatQ4,c(SApart,as.numeric(sub.CO2012[i,3:4]),PollersIND)) 
+}
+
+Ghat1<-apply(COdMatQ4,1,Deritive, beta=coef(logitreg)) 
+Ghat2<-COdMatQ4*Ghat1 
+Ghat3<-Ghat2*((-1)^(1+as.numeric(sub.CO2012[,1]))) 
+Ghat<-colMeans(Ghat3)
+Varphat<-t(Ghat)%*%vcov(logitreg)%*%Ghat 
+COPredIntQ4Dem<-c(COmeanProbDemwin-qnorm(0.975)*sqrt(Varphat),COmeanProbDemwin+qnorm(0.975)*sqrt(Varphat)) 
+Ghat3rep<-Ghat2*((-1)^(as.numeric(sub.CO2012[,1]))) 
+Ghatrep<-colMeans(Ghat3rep) 
+Varphatrep<-t(Ghatrep)%*%vcov(logitreg)%*%Ghatrep 
+COPredIntQ4Rep<-c(COmeanProbGopwin-qnorm(0.975)*sqrt(Varphatrep),COmeanProbGopwin+qnorm(0.975)*sqrt(Varphatrep))
+
+## Depend on Q5
+## Prediction intervals for "MI" state
+locations<-which(subdataset2012[,2]=="MI") 
+sub.MI2012<-subdataset2012[locations,] 
+ModMatQ5<-NULL
+for (i in 1:dim(sub.MI2012)[1])
+{
+  pollerloc2008<-which(subdataset2008[,5]==sub.MI2012[i,5]) 
+  PollersIND<-model.matrix(logitreg1)[pollerloc2008[1],c(4:16)]
+  ModMatQ5<-rbind(ModMatQ5,c(1,as.numeric(sub.MI2012[i,3:4]),PollersIND)) 
+}
+Ghat1<-apply(ModMatQ5,1,Deritive,beta=coef(logitreg1)) 
+Ghat2<-ModMatQ5*Ghat1 
+Ghat3<-Ghat2*((-1)^(1+as.numeric(sub.MI2012[,1]))) 
+Ghat<-colMeans(Ghat3)
+Varphat<-t(Ghat)%*%vcov(logitreg1)%*%Ghat 
+MIPredIntQ5Dem<-c(MImeanProbDemwin1-qnorm(0.975)*sqrt(Varphat),MImeanProbDemwin1+qnorm(0.975)*sqrt(Varphat))
+Ghat3rep<-Ghat2*((-1)^(as.numeric(sub.MI2012[,1]))) 
+Ghatrep<-colMeans(Ghat3rep) 
+Varphatrep<-t(Ghatrep)%*%vcov(logitreg1)%*%Ghatrep 
+MIPredIntQ5Rep<-c(MImeanProbGopwin1-qnorm(0.975)*sqrt(Varphatrep),MImeanProbGopwin1+qnorm(0.975)*sqrt(Varphatrep))
+
+## Prediction intervals for "FL" state
+locations<-which(subdataset2012[,2]=="FL") 
+sub.FL2012<-subdataset2012[locations,] 
+ModMatQ5<-NULL
+for (i in 1:dim(sub.FL2012)[1])
+{
+  pollerloc2008<-which(subdataset2008[,5]==sub.FL2012[i,5]) 
+  PollersIND<-model.matrix(logitreg1)[pollerloc2008[1],c(4:16)]
+  ModMatQ5<-rbind(ModMatQ5,c(1,as.numeric(sub.FL2012[i,3:4]),PollersIND)) 
+}
+Ghat1<-apply(ModMatQ5,1,Deritive,beta=coef(logitreg1)) 
+Ghat2<-ModMatQ5*Ghat1 
+Ghat3<-Ghat2*((-1)^(1+as.numeric(sub.FL2012[,1]))) 
+Ghat<-colMeans(Ghat3)
+Varphat<-t(Ghat)%*%vcov(logitreg1)%*%Ghat 
+FLPredIntQ5Dem<-c(FLmeanProbDemwin1-qnorm(0.975)*sqrt(Varphat),FLmeanProbDemwin1+qnorm(0.975)*sqrt(Varphat))
+Ghat3rep<-Ghat2*((-1)^(as.numeric(sub.FL2012[,1]))) 
+Ghatrep<-colMeans(Ghat3rep) 
+Varphatrep<-t(Ghatrep)%*%vcov(logitreg1)%*%Ghatrep 
+FLPredIntQ5Rep<-c(FLmeanProbGopwin1-qnorm(0.975)*sqrt(Varphatrep),FLmeanProbGopwin1+qnorm(0.975)*sqrt(Varphatrep))
+
+## Prediction intervals for "MO" state
+locations<-which(subdataset2012[,2]=="MO") 
+sub.MO2012<-subdataset2012[locations,] 
+ModMatQ5<-NULL
+for (i in 1:dim(sub.MO2012)[1])
+{
+  pollerloc2008<-which(subdataset2008[,5]==sub.MO2012[i,5]) 
+  PollersIND<-model.matrix(logitreg1)[pollerloc2008[1],c(4:16)]
+  ModMatQ5<-rbind(ModMatQ5,c(1,as.numeric(sub.MO2012[i,3:4]),PollersIND)) 
+}
+Ghat1<-apply(ModMatQ5,1,Deritive,beta=coef(logitreg1)) 
+Ghat2<-ModMatQ5*Ghat1 
+Ghat3<-Ghat2*((-1)^(1+as.numeric(sub.MO2012[,1]))) 
+Ghat<-colMeans(Ghat3)
+Varphat<-t(Ghat)%*%vcov(logitreg1)%*%Ghat 
+MOPredIntQ5Dem<-c(MOmeanProbDemwin1-qnorm(0.975)*sqrt(Varphat),MOmeanProbDemwin1+qnorm(0.975)*sqrt(Varphat))
+Ghat3rep<-Ghat2*((-1)^(as.numeric(sub.MO2012[,1]))) 
+Ghatrep<-colMeans(Ghat3rep) 
+Varphatrep<-t(Ghatrep)%*%vcov(logitreg1)%*%Ghatrep 
+MOPredIntQ5Rep<-c(MOmeanProbGopwin1-qnorm(0.975)*sqrt(Varphatrep),MOmeanProbGopwin1+qnorm(0.975)*sqrt(Varphatrep))
+
+## Prediction intervals for "CO" state
+locations<-which(subdataset2012[,2]=="CO") 
+sub.CO2012<-subdataset2012[locations,] 
+COdMatQ5<-NULL
+for (i in 1:dim(sub.CO2012)[1])
+{
+  pollerloc2008<-which(subdataset2008[,5]==sub.CO2012[i,5]) 
+  PollersIND<-model.matrix(logitreg1)[pollerloc2008[1],c(4:16)]
+  COdMatQ5<-rbind(COdMatQ5,c(1,as.numeric(sub.CO2012[i,3:4]),PollersIND)) 
+}
+Ghat1<-apply(COdMatQ5,1,Deritive,beta=coef(logitreg1)) 
+Ghat2<-COdMatQ5*Ghat1 
+Ghat3<-Ghat2*((-1)^(1+as.numeric(sub.CO2012[,1]))) 
+Ghat<-colMeans(Ghat3)
+Varphat<-t(Ghat)%*%vcov(logitreg1)%*%Ghat 
+COPredIntQ5Dem<-c(COmeanProbDemwin1-qnorm(0.975)*sqrt(Varphat),COmeanProbDemwin1+qnorm(0.975)*sqrt(Varphat))
+Ghat3rep<-Ghat2*((-1)^(as.numeric(sub.CO2012[,1]))) 
+Ghatrep<-colMeans(Ghat3rep) 
+Varphatrep<-t(Ghatrep)%*%vcov(logitreg1)%*%Ghatrep 
+COPredIntQ5Rep<-c(COmeanProbGopwin1-qnorm(0.975)*sqrt(Varphatrep),COmeanProbGopwin1+qnorm(0.975)*sqrt(Varphatrep))
+
+MIPredIntQ4Rep
+FLPredIntQ4Rep
+MOPredIntQ4Rep
+COPredIntQ4Rep
+
+MIPredIntQ5Rep
+FLPredIntQ5Rep
+MOPredIntQ5Rep
+COPredIntQ5Rep
+
+
+# Q9
+## Step 1: Compute average errors
+statedgesbypolls<-polls2008sub[,2]-polls2008sub[,3] 
+subSEbypolls<-statedgesbypolls[dataset2008[,2]%in%stateslist] 
+subSEwithstates<-cbind(subdataset2008[,c(2,5)],subSEbypolls) 
+trueSE<-results2008[,2]-results2008[,3] 
+trueSEexpand<-rep(0,length(subSEbypolls))
+for (i in 1:length(subSEbypolls))
+{
+  loc<-which(results2008[,1]==subSEwithstates[i,1])
+  trueSEexpand[i]<-trueSE[loc]
+}
+Errors<-abs(as.numeric(subSEwithstates[,3])-trueSEexpand) 
+subSEs<-cbind(subSEwithstates,trueSEexpand,Errors) 
+Errorbypollers<-tapply(Errors,subSEs[,2],mean)
+
+## Step 2: Compute weights
+rankPollers<-rank(Errorbypollers)
+weights<-1/(rankPollers^2)
+
+## Step 3: Compute weighted averages
+poll2012<-polls2012sub[dataset2012[,2]%in%stateslist,] 
+poll2012weights<-rep(0,dim(poll2012)[1])
+for (i in 1:length(poll2012weights))
+{
+  locwei<-which(names(weights)==poll2012[i,5])
+  poll2012weights[i]<-weights[locwei]
+}
+DemPollsWei<-poll2012[,2]*poll2012weights 
+RepPollsWei<-poll2012[,3]*poll2012weights
+DemAveNA<-tapply(DemPollsWei,poll2012[,1],sum)/tapply(poll2012weights,poll2012[, 1],sum)
+DemAve<-DemAveNA[!is.na(DemAveNA)]
+RepAveNA<-tapply(RepPollsWei,poll2012[,1],sum)/tapply(poll2012weights,poll2012[, 1],sum)
+RepAve<-RepAveNA[!is.na(RepAveNA)]
+
+fourstates<-c("MI","FL","MO","CO")
+DemAve[names(DemAve)%in%fourstates]
+RepAve[names(RepAve)%in%fourstates]
