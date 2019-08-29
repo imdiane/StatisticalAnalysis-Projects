@@ -1,0 +1,73 @@
+library("ade4")
+library("glmmML")
+library("MASS")
+library("nlme")
+library("lme4")
+load("/Alldata.Rdata")
+
+sample_terms<-Alldata$originaldata[,128:130] 
+mc<-dim(sample_terms)[1]
+SPTermlist<-NULL 
+for (j in 1:mc)
+{
+  list<-NULL 
+  for (k in 1:3)
+  {
+    SPTerm<-as.character(sample_terms[j,k]) 
+    getsample_terms<-unlist(strsplit(SPTerm,"///")) 
+    repj<-rep(j,length(getsample_terms)) 
+    newlist<-cbind(repj,getsample_terms) 
+    list<-rbind(list,newlist)
+  } 
+  SPTermlist<-rbind(SPTermlist,list)
+}
+SP<-which(SPTermlist[,2]=="GO:0005829") 
+rownums<-as.numeric(SPTermlist[SP,1]) 
+subsetGenes<-Alldata$originaldata[rownums,c(3:110)]
+
+
+#define three covariates beverage effects, time effects and individual effects respectively.
+samIDs<-names(subsetGenes)
+Beverages<-(samIDs%in%Alldata$trt1)*1+(samIDs%in%Alldata$trt2)*2+(samIDs%in%Alldata$trt3)*3+(samIDs%in%Alldata$trt4)*4
+Subject<-(samIDs%in%Alldata$ind1)*1+(samIDs%in%Alldata$ind2)*2+(samIDs%in%Alldata$ind3)*3+(samIDs%in% Alldata$ind4)*4+(samIDs%in%Alldata$ind5)*5+(samIDs%in%Alldata$ind6)*6
+hours<-(samIDs%in%Alldata$time_h0)*0+(samIDs%in%Alldata$time_h1)*1+(samIDs%in%Alldata$time_h2)*2+( samIDs%in%Alldata$time_h4)*4+(samIDs%in%Alldata$time_h12)*12
+
+BeverFac<-as.factor(Beverages) 
+hourFac<-as.factor(hours) 
+SubjFac<-as.factor(Subject)
+resp<-as.numeric(subsetGenes[1,]) 
+
+#simple linear regression model
+slm<-lm(resp~BeverFac)
+summary(slm)
+
+#multiple linear regression model
+mlm<-lm(resp~BeverFac+hourFac+SubjFac) 
+summary(mlm)
+
+mlm1<-lm(resp~BeverFac+hourFac+SubjFac+BeverFac*hourFac+BeverFac*SubjFac+hourFac*SubjFac+BeverFac*hourFac*SubjFac) 
+summary(mlm1)
+
+
+#linear mixed model 1
+hours2<-hours^2 
+combfacs<-Subject*10+Beverages
+
+lmm1<-gls(resp~BeverFac+hours+hours2,correlation=corCompSymm(form=~1|combfacs),weights=varIdent(form=~1|combfacs),method="REML") 
+summary(lmm1)
+
+#linear mixed model 2
+lmm2<-gls(resp~BeverFac+hours+hours2,correlation=corAR1(form=~1|combfacs),weights=varIdent(form=~1|combfacs),method="REML") 
+summary(lmm2)
+
+#linear mixed model（final）
+lmm<-gls(resp~BeverFac++hours+hours2+BeverFac*hours+BeverFac*hours2,correlation=corCompSymm(form=~1|combfacs),weights=varIdent(form=~1| combfacs),method="REML")
+summary(lmm)
+anova(lmm)
+
+#model diagnostic
+plot(BeverFac,residuals(lmm))
+plot(hours,residuals(lmm))
+plot(hours2,residuals(lmm))
+abline(lmm)
+qqnorm(resp)
