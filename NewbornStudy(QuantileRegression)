@@ -1,0 +1,34 @@
+library(SparseM)
+library(quantreg)
+
+setwd("")
+bwt<-read.csv(file="bwt.csv",header=T)
+
+fit1<-rq(Weight~Black+Married+Boy+Visit+MomEdLevel+MomSmoke+CigsPerDay+MomAge+MomAge^2+MomWtGain+MomWtGain^2,tau=0.1,data=bwt)
+
+fit2<-rq(Weight~Black+Married+Boy+Visit+MomEdLevel+MomSmoke+CigsPerDay+MomAge+MomAge^2+MomWtGain+MomWtGain^2,tau=0.5,data=bwt)
+
+fit3<-rq(Weight~Black+Married+Boy+Visit+MomEdLevel+MomSmoke+CigsPerDay+MomAge+MomAge^2+MomWtGain+MomWtGain^2,tau=0.9,data=bwt)
+
+summary(fit1)
+
+summary(fit2)
+
+summary(fit3)
+
+
+Interpret the results：
+
+Under different tau values, we gain different intercepts and slopes.
+
+With tau=0.1, we gain the intercept 2685.04287 and the slope Black -244.36662, Married 94.20381, 
+Boy 76.93263, Visit 9.24855, MomEdLevel 3.11109, MomSmoke -145.69383, CigsPerDay -8.69883, MomAge 2.98928, MomWtGain 9.99200;
+
+With tau=0.5, we gain the intercept 3307.52108 and the slope Black -172.81036, Married 67.91586, 
+Boy 120.69477, Visit 8.88944, MomEdLevel -1.94741, MomSmoke -160.69198, CigsPerDay -4.10805, MomAge 6.65264, MomWtGain 7.28421;
+
+With tau=0.9, we gain the intercept 3923.19796 and the slope Black -155.92821, Married 66.31394, 
+Boy 135.11268, Visit 3.15982, MomEdLevel -11.83779, MomSmoke -172.49730, CigsPerDay -2.57717, MomAge 9.21672, MomWtGain 6.93003.
+
+As the tau value increases, we can conclude that the variables (Black, Boy, CigsPerDay, MomAge,MomAge^2) influences the baby weight more significantly from the increasing slopes; 
+the variables (Married,Visit, MomEdLevel, MomSmoke, MomWtGain, MomWtGain^2) influences the baby weight less significantly from the increasing slopes.
